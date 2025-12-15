@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  postgres-source:
+    image: postgres:15-alpine
+    container_name: postgres-source
+    environment: # Better to use .env variables
+      POSTGRES_USER: 
+      POSTGRES_PASSWORD: 
+      POSTGRES_DB: 
+    
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=5"
+      - "-c"
+      - "max_wal_senders=5"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-source-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - db-sync-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U source_user -d source_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-target:
+    image: mysql:8.0
+    container_name: 
+    environment: # Better to use .env variables.
+      MYSQL_ROOT_PASSWORD: 
+      MYSQL_DATABASE: 
+      MYSQL_USER: 
+      MYSQL_PASSWORD: 
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-target-data:/var/lib/mysql
+    networks:
+      - db-sync-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "mysql_user", "-pmysql123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-sync:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: db-sync-app
+    depends_on:
+      - postgres-source
+      - mysql-target
+    environment:
+      CONFIG_FILE: /app/config/config.yaml
+      LOG_LEVEL: INFO
+      JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
+      POSTGRES_HOST: postgres-source # If you use containers for db write their names here
+      MYSQL_HOST: mysql-target
+    volumes:
+      - ../config:/app/config
+      - ../data:/app/data
+      - ../logs:/app/logs
+    networks:
+      - db-sync-network
+    restart: unless-stopped
+
+networks:
+  db-sync-network:
+    driver: bridge
+
+volumes:
+  postgres-source-data:
+  mysql-target-data:
+  

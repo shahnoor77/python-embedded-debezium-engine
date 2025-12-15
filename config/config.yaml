@@ -1,0 +1,72 @@
+# Source Database Configuration (PostgreSQL)
+source:
+  type: "postgresql"
+  host: "postgres-source" # I have this database on postgres-source container.
+  port: 5432
+  database: "your_db"
+  username: "anyuser"
+  password: "yourdbpass"
+  schema: "public"
+  ssl_mode: "disable"
+
+# Target Database Configuration (MySQL)
+target:
+  type: "mysql"
+  host: "mysql-target" # I have databases on containers so I am using it here.
+  port: 3306
+  database: "mysqldbname"
+  username: "anyuser"
+  password: "yourdbpass"
+  ssl_mode: "disabled"
+  #schema: "target_db"
+
+# Debezium Embedded Engine Configuration
+debezium:
+  connector_class: "io.debezium.connector.postgresql.PostgresConnector"
+  server_name: "dbsync_postgres"
+  schema_include_list: "public"
+  plugin_name: "pgoutput"
+  slot_name: "debezium_slot"
+  publication_name: "dbz_publication"
+  snapshot_mode: "initial" # will change to "when-needed" # based on user requirement
+  snapshot_locking_mode: "minimal"
+  offset_storage: "org.apache.kafka.connect.storage.FileOffsetBackingStore"
+  offset_storage_file_filename: "offsets.dat"
+  offset_flush_interval_ms: 10000
+  schema_history_internal: "io.debezium.storage.file.history.FileSchemaHistory"
+  schema_history_internal_file_filename: "schema-history.dat" # the file name is used to avoid path conflict
+  decimal_handling_mode: "double"
+  time_precision_mode: "adaptive"
+  include_schema_changes: true
+  topic_prefix: "dbsync"  # placeholder, no Kafka is used
+
+# Logging
+logging:
+  level: "DEBUG"
+  format: "json"
+  file: "/app/logs/db-sync.log"
+  max_bytes: 10485760
+  backup_count: 5
+kafka:
+  bootstrap_servers: ""
+  group_id: "db-sync-group"
+
+sync:
+  initial_load:
+    enabled: true
+    batch_size: 1000
+  cdc:
+    enabled: true
+
+monitoring:
+  enable_metrics: true
+  metrics_port: 9090
+  health_check_port: 8080
+
+performance:
+  max_workers: 10
+  queue_size: 10000
+
+state:
+  storage_path: "/app/data/state"
+  checkpoint_interval_seconds: 60
